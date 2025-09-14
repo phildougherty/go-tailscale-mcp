@@ -92,6 +92,7 @@ type ACL struct {
 	ACLs       []ACLRule           `json:"acls"`
 	Tests      []ACLTest           `json:"tests,omitempty"`
 	AutoApprovers map[string][]string `json:"autoApprovers,omitempty"`
+	RawPolicy  string              `json:"-"` // Raw HuJSON policy from API
 }
 
 // ACLRule represents a single ACL rule

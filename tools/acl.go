@@ -37,19 +37,10 @@ func RegisterACLTools(server *mcp.Server, api *tailscale.APIClient) {
 				}, nil
 			}
 
-			// Pretty print the ACL
-			aclJSON, err := json.MarshalIndent(acl, "", "  ")
-			if err != nil {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						&mcp.TextContent{Text: fmt.Sprintf("Error formatting ACL: %v", err)},
-					},
-				}, nil
-			}
-
+			// Return the raw HuJSON policy
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
-					&mcp.TextContent{Text: fmt.Sprintf("Current ACL Policy:\n\n%s", string(aclJSON))},
+					&mcp.TextContent{Text: fmt.Sprintf("Current ACL Policy (HuJSON format):\n\n%s", acl.RawPolicy)},
 				},
 			}, nil
 		}),
@@ -91,14 +82,11 @@ func RegisterACLTools(server *mcp.Server, api *tailscale.APIClient) {
 				}, nil
 			}
 
-			// Parse the ACL JSON
+			// Try to parse as JSON first, otherwise treat as HuJSON
 			var acl tailscale.ACL
 			if err := json.Unmarshal([]byte(params.ACL), &acl); err != nil {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						&mcp.TextContent{Text: fmt.Sprintf("Invalid ACL JSON format: %v", err)},
-					},
-				}, nil
+				// Not valid JSON, treat as HuJSON
+				acl.RawPolicy = params.ACL
 			}
 
 			// Validate the ACL first
@@ -163,14 +151,11 @@ func RegisterACLTools(server *mcp.Server, api *tailscale.APIClient) {
 				}, nil
 			}
 
-			// Parse the ACL JSON
+			// Try to parse as JSON first, otherwise treat as HuJSON
 			var acl tailscale.ACL
 			if err := json.Unmarshal([]byte(params.ACL), &acl); err != nil {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						&mcp.TextContent{Text: fmt.Sprintf("Invalid ACL JSON format: %v", err)},
-					},
-				}, nil
+				// Not valid JSON, treat as HuJSON
+				acl.RawPolicy = params.ACL
 			}
 
 			// Validate the ACL

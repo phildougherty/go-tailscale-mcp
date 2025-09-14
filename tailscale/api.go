@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -131,7 +132,12 @@ func (c *APIClient) doRequest(method, path string, body interface{}) (*http.Resp
 
 // ListDevices lists all devices in the tailnet
 func (c *APIClient) ListDevices() ([]Device, error) {
-	path := fmt.Sprintf("/tailnet/%s/devices", c.tailnet)
+	tailnet := url.QueryEscape(c.tailnet)
+	if c.tailnet == "-" || c.tailnet == "" {
+		return nil, fmt.Errorf("tailnet not configured - set TAILSCALE_TAILNET environment variable")
+	}
+
+	path := fmt.Sprintf("/tailnet/%s/devices", tailnet)
 	resp, err := c.doRequest("GET", path, nil)
 	if err != nil {
 		return nil, err
@@ -209,25 +215,73 @@ func (c *APIClient) SetDeviceTags(deviceID string, tags []string) error {
 
 // GetACL gets the current ACL policy
 func (c *APIClient) GetACL() (*ACL, error) {
-	path := fmt.Sprintf("/tailnet/%s/acl", c.tailnet)
+	// Use URL encoding for email-based tailnets
+	tailnet := url.QueryEscape(c.tailnet)
+	if c.tailnet == "-" || c.tailnet == "" {
+		// If tailnet is not set, return an error
+		return nil, fmt.Errorf("tailnet not configured - set TAILSCALE_TAILNET environment variable")
+	}
+
+	path := fmt.Sprintf("/tailnet/%s/acl", tailnet)
 	resp, err := c.doRequest("GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	var acl ACL
-	if err := json.NewDecoder(resp.Body).Decode(&acl); err != nil {
-		return nil, err
+	// The ACL endpoint returns HuJSON (with comments), not pure JSON
+	// Read it as raw text for now
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read ACL response: %w", err)
 	}
 
-	return &acl, nil
+	// For now, return the raw ACL as a string in a simplified structure
+	// A full implementation would parse HuJSON properly
+	acl := &ACL{
+		RawPolicy: string(bodyBytes),
+	}
+
+	return acl, nil
 }
 
 // SetACL updates the ACL policy
 func (c *APIClient) SetACL(acl *ACL) error {
-	path := fmt.Sprintf("/tailnet/%s/acl", c.tailnet)
-	resp, err := c.doRequest("POST", path, acl)
+	tailnet := url.QueryEscape(c.tailnet)
+	if c.tailnet == "-" || c.tailnet == "" {
+		return fmt.Errorf("tailnet not configured - set TAILSCALE_TAILNET environment variable")
+	}
+
+	path := fmt.Sprintf("/tailnet/%s/acl", tailnet)
+
+	// If we have raw policy, send that directly as HuJSON
+	var body interface{}
+	if acl.RawPolicy != "" {
+		// Send raw HuJSON directly
+		req, err := http.NewRequest("POST", c.baseURL+path, strings.NewReader(acl.RawPolicy))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		req.Header.Set("Content-Type", "application/hujson")
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("API error %d: %s", resp.StatusCode, string(bodyBytes))
+		}
+		return nil
+	} else {
+		// Send structured ACL as JSON
+		body = acl
+	}
+
+	resp, err := c.doRequest("POST", path, body)
 	if err != nil {
 		return err
 	}
@@ -238,7 +292,36 @@ func (c *APIClient) SetACL(acl *ACL) error {
 
 // ValidateACL validates an ACL policy without applying it
 func (c *APIClient) ValidateACL(acl *ACL) error {
-	path := fmt.Sprintf("/tailnet/%s/acl/validate", c.tailnet)
+	tailnet := url.QueryEscape(c.tailnet)
+	if c.tailnet == "-" || c.tailnet == "" {
+		return fmt.Errorf("tailnet not configured - set TAILSCALE_TAILNET environment variable")
+	}
+
+	path := fmt.Sprintf("/tailnet/%s/acl/validate", tailnet)
+
+	// If we have raw policy, validate that directly as HuJSON
+	if acl.RawPolicy != "" {
+		req, err := http.NewRequest("POST", c.baseURL+path, strings.NewReader(acl.RawPolicy))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		req.Header.Set("Content-Type", "application/hujson")
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("API error %d: %s", resp.StatusCode, string(bodyBytes))
+		}
+		return nil
+	}
+
+	// Validate structured ACL
 	resp, err := c.doRequest("POST", path, acl)
 	if err != nil {
 		return err
@@ -439,7 +522,15 @@ func (c *APIClient) ApproveRoutes(deviceID string, routes []string) error {
 
 // Helper function to check if API is available
 func (c *APIClient) IsAvailable() bool {
-	return c.apiKey != "" && c.tailnet != ""
+	return c.apiKey != "" && c.tailnet != "" && c.tailnet != "-"
+}
+
+// getTailnetPath returns the URL-encoded tailnet for use in API paths
+func (c *APIClient) getTailnetPath() (string, error) {
+	if c.tailnet == "" || c.tailnet == "-" {
+		return "", fmt.Errorf("tailnet not configured - set TAILSCALE_TAILNET environment variable")
+	}
+	return url.QueryEscape(c.tailnet), nil
 }
 
 // AuthKeyOptions defines options for creating an auth key
