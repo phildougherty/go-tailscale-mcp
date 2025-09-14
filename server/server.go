@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/phildougherty/go-tailscale-mcp/tailscale"
@@ -11,6 +12,7 @@ import (
 type TailscaleServer struct {
 	*mcp.Server
 	cli *tailscale.CLI
+	api *tailscale.APIClient
 }
 
 func NewTailscaleServer() (*TailscaleServer, error) {
@@ -28,9 +30,31 @@ func NewTailscaleServer() (*TailscaleServer, error) {
 	// Create Tailscale CLI wrapper
 	cli := tailscale.NewCLI()
 
+	// Create API client if API key is provided
+	var apiClient *tailscale.APIClient
+	if apiKey := os.Getenv("TAILSCALE_API_KEY"); apiKey != "" {
+		var err error
+
+		// Check if tailnet is explicitly provided
+		if tailnet := os.Getenv("TAILSCALE_TAILNET"); tailnet != "" {
+			apiClient, err = tailscale.NewAPIClientWithTailnet(apiKey, tailnet)
+		} else {
+			apiClient, err = tailscale.NewAPIClient(apiKey)
+		}
+
+		if err != nil {
+			// Log error but continue without API
+			fmt.Fprintf(os.Stderr, "Warning: Failed to initialize Tailscale API client: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Hint: Set TAILSCALE_TAILNET environment variable to your tailnet domain (e.g., your-email@example.com)\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "Tailscale API client initialized successfully\n")
+		}
+	}
+
 	ts := &TailscaleServer{
 		Server: server,
 		cli:    cli,
+		api:    apiClient,
 	}
 
 	// Register all tools
@@ -44,10 +68,17 @@ func NewTailscaleServer() (*TailscaleServer, error) {
 func (s *TailscaleServer) registerTools() error {
 	// Register all Tailscale tool categories
 	tools.RegisterProfileTools(s.Server, s.cli)
-	tools.RegisterDeviceTools(s.Server, s.cli)
+	tools.RegisterDeviceToolsWithAPI(s.Server, s.cli, s.api)
 	tools.RegisterNetworkTools(s.Server, s.cli)
-	tools.RegisterRoutingTools(s.Server, s.cli)
+	tools.RegisterRoutingToolsWithAPI(s.Server, s.cli, s.api)
 	tools.RegisterSystemTools(s.Server, s.cli)
+
+	// Register API-specific tools if API is available
+	if s.api != nil && s.api.IsAvailable() {
+		tools.RegisterACLTools(s.Server, s.api)
+		tools.RegisterAuthKeyTools(s.Server, s.api)
+		tools.RegisterDNSAPITools(s.Server, s.api)
+	}
 
 	return nil
 }

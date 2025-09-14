@@ -250,3 +250,75 @@ func RegisterRoutingTools(server *mcp.Server, cli *tailscale.CLI) {
 		}),
 	)
 }
+
+// RegisterRoutingToolsWithAPI registers routing and exit node tools with API client support
+func RegisterRoutingToolsWithAPI(server *mcp.Server, cli *tailscale.CLI, api *tailscale.APIClient) {
+	// Register all existing CLI-based tools first
+	RegisterRoutingTools(server, cli)
+
+	// Approve routes tool (API-only)
+	server.AddTool(
+		&mcp.Tool{
+			Name:        "approve_routes",
+			Description: "Approve advertised routes for a device",
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"device_id": {
+						Type:        "string",
+						Description: "Device ID to approve routes for",
+					},
+					"routes": {
+						Type: "array",
+						Items: &jsonschema.Schema{Type: "string"},
+						Description: "List of routes to approve (e.g., ['192.168.1.0/24', '10.0.0.0/8'])",
+					},
+				},
+				Required: []string{"device_id", "routes"},
+			},
+		},
+		mcp.ToolHandler(func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if api == nil || !api.IsAvailable() {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: "API client not configured. Route approval requires API access. Please set TAILSCALE_API_KEY environment variable."},
+					},
+				}, nil
+			}
+
+			var params struct {
+				DeviceID string   `json:"device_id"`
+				Routes   []string `json:"routes"`
+			}
+			if err := json.Unmarshal(req.Params.Arguments, &params); err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: fmt.Sprintf("Invalid parameters: %v", err)},
+					},
+				}, nil
+			}
+
+			if len(params.Routes) == 0 {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: "No routes specified. Please provide at least one route to approve."},
+					},
+				}, nil
+			}
+
+			if err := api.ApproveRoutes(params.DeviceID, params.Routes); err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: fmt.Sprintf("Error approving routes: %v", err)},
+					},
+				}, nil
+			}
+
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					&mcp.TextContent{Text: fmt.Sprintf("Routes approved successfully for device %s: %s", params.DeviceID, strings.Join(params.Routes, ", "))},
+				},
+			}, nil
+		}),
+	)
+}

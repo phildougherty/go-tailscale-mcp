@@ -83,11 +83,50 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 {
   "mcpServers": {
     "tailscale": {
-      "command": "/path/to/tailscale-mcp"
+      "command": "/path/to/tailscale-mcp",
+      "env": {
+        "TAILSCALE_API_KEY": "tskey-api-...",
+        "TAILSCALE_TAILNET": "your-email@example.com"
+      }
     }
   }
 }
 ```
+
+Or using the Claude CLI:
+
+```bash
+# Add with API support
+claude mcp add -s user tailscale /path/to/tailscale-mcp \
+  -e TAILSCALE_API_KEY=tskey-api-... \
+  -e TAILSCALE_TAILNET=your-email@example.com
+```
+
+### API Configuration
+
+To enable full functionality including device authorization, ACL management, and auth key operations, configure the Tailscale API:
+
+1. **Get a Tailscale API Key:**
+   - Go to https://login.tailscale.com/admin/settings/keys
+   - Create a new API key
+   - Copy the key (starts with `tskey-api-`)
+
+2. **Set Environment Variables:**
+   ```bash
+   export TAILSCALE_API_KEY="tskey-api-..."
+   export TAILSCALE_TAILNET="your-email@example.com"  # or your organization domain
+   ```
+
+3. **API-Enabled Features:**
+   With the API configured, you gain access to:
+   - Device authorization and removal
+   - ACL policy management
+   - Authentication key creation and management
+   - DNS configuration
+   - Route approval
+   - Device tagging
+
+Without the API, the server still provides full network management through the CLI tools.
 
 ## Available Tools
 
@@ -235,15 +274,38 @@ go-tailscale-mcp/
     └── types.go         # Type definitions
 ```
 
-## Limitations
+### API-Only Tools (Requires TAILSCALE_API_KEY)
 
-Some operations require Tailscale admin API access with an API key:
-- Device authorization/removal
-- ACL management
-- Authentication key operations
-- Advanced DNS configuration
+#### ACL Management
+- `get_acl` - Get current ACL policy
+- `update_acl` - Update ACL policy with validation
+- `validate_acl` - Validate ACL without applying
 
-For these operations, the server provides guidance on using the Tailscale admin console.
+#### Authentication Keys
+- `create_auth_key` - Create new auth key with options
+- `list_auth_keys` - List all auth keys with details
+- `delete_auth_key` - Delete an auth key
+
+#### DNS API Configuration
+- `get_dns_config` - Get complete DNS configuration
+- `set_dns_nameservers` - Configure DNS nameservers
+- `set_dns_preferences` - Enable/disable MagicDNS
+- `set_dns_search_paths` - Set DNS search paths
+
+#### Enhanced Device Operations (with API)
+- `authorize_device` - Authorize pending devices (API-enabled)
+- `delete_device` - Remove devices from network (API-enabled)
+- `set_device_tags` - Manage device tags (API-enabled)
+
+#### Route Management (with API)
+- `approve_routes` - Approve advertised routes (API-enabled)
+
+## Configuration Options
+
+### Environment Variables
+
+- `TAILSCALE_API_KEY` - Your Tailscale API key for admin operations
+- `TAILSCALE_TAILNET` - Your tailnet domain (e.g., your-email@example.com or org.domain)
 
 ## Development
 

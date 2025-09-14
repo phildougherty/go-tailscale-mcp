@@ -246,3 +246,177 @@ func RegisterDeviceTools(server *mcp.Server, cli *tailscale.CLI) {
 		}),
 	)
 }
+
+// RegisterDeviceToolsWithAPI registers device operation tools with API client support
+func RegisterDeviceToolsWithAPI(server *mcp.Server, cli *tailscale.CLI, api *tailscale.APIClient) {
+	// Register all existing CLI-based tools first
+	RegisterDeviceTools(server, cli)
+
+	// Authorize device tool (API-enhanced)
+	server.AddTool(
+		&mcp.Tool{
+			Name:        "authorize_device",
+			Description: "Authorize a device in the Tailscale network",
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"device_id": {
+						Type:        "string",
+						Description: "Device ID to authorize",
+					},
+				},
+				Required: []string{"device_id"},
+			},
+		},
+		mcp.ToolHandler(func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			var params struct {
+				DeviceID string `json:"device_id"`
+			}
+			if err := json.Unmarshal(req.Params.Arguments, &params); err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: fmt.Sprintf("Invalid parameters: %v", err)},
+					},
+				}, nil
+			}
+
+			// Try API first if available
+			if api != nil && api.IsAvailable() {
+				if err := api.AuthorizeDevice(params.DeviceID); err != nil {
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{
+							&mcp.TextContent{Text: fmt.Sprintf("Error authorizing device via API: %v", err)},
+						},
+					}, nil
+				}
+
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: fmt.Sprintf("Device %s authorized successfully via API.", params.DeviceID)},
+					},
+				}, nil
+			}
+
+			// Fallback to CLI (if implemented)
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					&mcp.TextContent{Text: "API client not configured. Device authorization requires API access. Please set TAILSCALE_API_KEY environment variable."},
+				},
+			}, nil
+		}),
+	)
+
+	// Delete device tool (API-enhanced)
+	server.AddTool(
+		&mcp.Tool{
+			Name:        "delete_device",
+			Description: "Remove a device from the Tailscale network",
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"device_id": {
+						Type:        "string",
+						Description: "Device ID to remove",
+					},
+				},
+				Required: []string{"device_id"},
+			},
+		},
+		mcp.ToolHandler(func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			var params struct {
+				DeviceID string `json:"device_id"`
+			}
+			if err := json.Unmarshal(req.Params.Arguments, &params); err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: fmt.Sprintf("Invalid parameters: %v", err)},
+					},
+				}, nil
+			}
+
+			// Try API first if available
+			if api != nil && api.IsAvailable() {
+				if err := api.DeleteDevice(params.DeviceID); err != nil {
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{
+							&mcp.TextContent{Text: fmt.Sprintf("Error deleting device via API: %v", err)},
+						},
+					}, nil
+				}
+
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: fmt.Sprintf("Device %s deleted successfully via API.", params.DeviceID)},
+					},
+				}, nil
+			}
+
+			// Fallback to CLI (if implemented)
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					&mcp.TextContent{Text: "API client not configured. Device deletion requires API access. Please set TAILSCALE_API_KEY environment variable."},
+				},
+			}, nil
+		}),
+	)
+
+	// Set device tags tool (API-enhanced)
+	server.AddTool(
+		&mcp.Tool{
+			Name:        "set_device_tags",
+			Description: "Set tags for a device",
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"device_id": {
+						Type:        "string",
+						Description: "Device ID to set tags for",
+					},
+					"tags": {
+						Type: "array",
+						Items: &jsonschema.Schema{Type: "string"},
+						Description: "Tags to set for the device",
+					},
+				},
+				Required: []string{"device_id", "tags"},
+			},
+		},
+		mcp.ToolHandler(func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			var params struct {
+				DeviceID string   `json:"device_id"`
+				Tags     []string `json:"tags"`
+			}
+			if err := json.Unmarshal(req.Params.Arguments, &params); err != nil {
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: fmt.Sprintf("Invalid parameters: %v", err)},
+					},
+				}, nil
+			}
+
+			// Try API first if available
+			if api != nil && api.IsAvailable() {
+				if err := api.SetDeviceTags(params.DeviceID, params.Tags); err != nil {
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{
+							&mcp.TextContent{Text: fmt.Sprintf("Error setting device tags via API: %v", err)},
+						},
+					}, nil
+				}
+
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{
+						&mcp.TextContent{Text: fmt.Sprintf("Tags set successfully for device %s: %s", params.DeviceID, strings.Join(params.Tags, ", "))},
+					},
+				}, nil
+			}
+
+			// Fallback to CLI (if implemented)
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					&mcp.TextContent{Text: "API client not configured. Setting device tags requires API access. Please set TAILSCALE_API_KEY environment variable."},
+				},
+			}, nil
+		}),
+	)
+}
