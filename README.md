@@ -44,13 +44,10 @@ A Model Context Protocol (MCP) server for managing Tailscale through a standardi
 - Preferences management
 
 ### Kubernetes Operator Management (Optional)
-- Monitor Tailscale Kubernetes operator status
-- Create and manage ProxyClass resources
-- Deploy ProxyGroups for high availability
+- Manage Tailscale Kubernetes operator resources
+- Create ProxyGroups, ProxyClasses, Connectors, and DNSConfigs
 - Configure Tailscale Ingress and Egress services
-- Manage Connectors for subnet routing and exit nodes
-- Configure DNSConfig resources
-- NOTE: Operator installation must be done manually using official methods
+- Requires manual operator installation first
 
 ## Installation
 
@@ -346,34 +343,67 @@ go-tailscale-mcp/
 
 ### Kubernetes Operator Tools (Requires ENABLE_K8S_OPERATOR=true)
 
-When enabled with the `ENABLE_K8S_OPERATOR=true` environment variable, the following tools become available:
+**Prerequisites:**
+1. Install the Tailscale Kubernetes operator first:
+   ```bash
+   # Using kubectl
+   kubectl apply -f https://tailscale.com/install/kubernetes/operator.yaml
 
-**Note:** The operator must be installed manually using the official Tailscale methods:
-- kubectl: `kubectl apply -f https://tailscale.com/install/kubernetes/operator.yaml`
-- Helm: `helm install tailscale-operator tailscale/tailscale-operator`
-- See: https://tailscale.com/kb/1236/kubernetes-operator
+   # Or using Helm
+   helm repo add tailscale https://pkgs.tailscale.com/helmcharts
+   helm install tailscale-operator tailscale/tailscale-operator
+   ```
+2. Set `ENABLE_K8S_OPERATOR=true` in your MCP configuration
+3. Ensure `kubectl` is configured with cluster access
 
-#### Operator Management
-- `mcp__tailscale__k8s_operator_status` - Check operator installation and health status
-- `mcp__tailscale__k8s_prepare_acl` - Get ACL configuration requirements for the operator
+#### Example Prompts
 
-#### ProxyClass Management
-- `mcp__tailscale__k8s_proxy_class_create` - Create ProxyClass for custom proxy configurations
-- `mcp__tailscale__k8s_proxy_class_list` - List all ProxyClass resources
-- `mcp__tailscale__k8s_proxy_class_delete` - Delete a ProxyClass resource
+**Exposing Services to Tailnet (Ingress):**
+```
+"Expose my nginx service on port 80 as 'webapp' to the tailnet"
+"Create a Tailscale ingress for service 'api-server' on port 8080"
+"Make my grafana dashboard accessible via Tailscale at hostname 'monitoring'"
+```
+Use case: Access internal Kubernetes services securely via your Tailscale network without public exposure.
 
-#### ProxyGroup Management
-- `mcp__tailscale__k8s_proxy_group_create` - Create ProxyGroup for HA configurations
-- `mcp__tailscale__k8s_proxy_group_status` - Get ProxyGroup status and readiness
-- `mcp__tailscale__k8s_proxy_group_scale` - Scale ProxyGroup replicas
+**Accessing External Tailnet Services (Egress):**
+```
+"Create an egress to access my database at 'db.tailnet' on port 5432"
+"Connect to external service 'backup-server.tailnet' from inside the cluster"
+"Set up egress for 'metrics-collector.tailnet' on port 9090"
+```
+Use case: Allow pods to connect to services running elsewhere in your tailnet.
 
-#### Ingress/Egress Services
-- `mcp__tailscale__k8s_ingress_create` - Create Tailscale ingress to expose services
-- `mcp__tailscale__k8s_egress_create` - Create egress service for tailnet access
+**High Availability with ProxyGroups:**
+```
+"Create a ProxyGroup with 3 replicas for high availability egress"
+"Deploy a ProxyGroup named 'ha-proxy' with type 'ingress' and 2 replicas"
+"Scale the ProxyGroup 'production-proxy' to 5 replicas"
+```
+Use case: Ensure resilient connectivity with multiple proxy replicas for production workloads.
 
-#### Connector & DNSConfig
-- `mcp__tailscale__k8s_connector_create` - Create Connector for subnet/exit node
-- `mcp__tailscale__k8s_dns_config_create` - Configure MagicDNS for Kubernetes
+**Subnet Routing with Connectors:**
+```
+"Create a Connector to advertise subnet 10.0.0.0/24 to the tailnet"
+"Set up a Connector as an exit node for the cluster"
+"Deploy a Connector with hostname 'k8s-subnet' advertising routes 192.168.1.0/24"
+```
+Use case: Share cluster pod/service networks with your tailnet or route cluster traffic through Tailscale.
+
+**DNS Configuration:**
+```
+"Enable MagicDNS for the cluster"
+"Create a DNSConfig with MagicDNS enabled"
+"Configure cluster DNS to use Tailscale MagicDNS"
+```
+Use case: Enable automatic DNS resolution for tailnet hostnames within the cluster.
+
+**ProxyClass for Custom Configuration:**
+```
+"Create a ProxyClass named 'production' with specific labels"
+"Deploy a ProxyClass for custom proxy pod configuration"
+```
+Use case: Define reusable proxy configurations for different environments or requirements.
 
 ## Configuration Options
 
