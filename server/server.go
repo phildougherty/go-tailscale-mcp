@@ -5,17 +5,19 @@ import (
 	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/phildougherty/go-tailscale-mcp/k8s"
 	"github.com/phildougherty/go-tailscale-mcp/tailscale"
 	"github.com/phildougherty/go-tailscale-mcp/tools"
 )
 
 type TailscaleServer struct {
 	*mcp.Server
-	cli *tailscale.CLI
-	api *tailscale.APIClient
+	cli              *tailscale.CLI
+	api              *tailscale.APIClient
+	enableK8sOperator bool
 }
 
-func NewTailscaleServer() (*TailscaleServer, error) {
+func NewTailscaleServer(enableK8sOperator bool) (*TailscaleServer, error) {
 	// Initialize the MCP server
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -52,9 +54,10 @@ func NewTailscaleServer() (*TailscaleServer, error) {
 	}
 
 	ts := &TailscaleServer{
-		Server: server,
-		cli:    cli,
-		api:    apiClient,
+		Server:           server,
+		cli:              cli,
+		api:              apiClient,
+		enableK8sOperator: enableK8sOperator,
 	}
 
 	// Register all tools
@@ -78,6 +81,14 @@ func (s *TailscaleServer) registerTools() error {
 		tools.RegisterACLTools(s.Server, s.api)
 		tools.RegisterAuthKeyTools(s.Server, s.api)
 		tools.RegisterDNSAPITools(s.Server, s.api)
+	}
+
+	// Register Kubernetes operator tools if enabled
+	if s.enableK8sOperator {
+		if err := k8s.RegisterK8sOperatorTools(s.Server); err != nil {
+			return fmt.Errorf("failed to register Kubernetes operator tools: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "Kubernetes operator tools enabled\n")
 	}
 
 	return nil

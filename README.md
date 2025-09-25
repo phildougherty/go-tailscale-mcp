@@ -43,12 +43,21 @@ A Model Context Protocol (MCP) server for managing Tailscale through a standardi
 - Detailed tailnet information
 - Preferences management
 
+### Kubernetes Operator (Optional)
+- Install and manage Tailscale Kubernetes operator
+- Create and manage ProxyClass resources
+- Deploy ProxyGroups for high availability
+- Configure Tailscale Ingress and Egress services
+- Manage Connectors for subnet routing and exit nodes
+- Configure DNSConfig resources
+
 ## Installation
 
 ### Prerequisites
 - Go 1.21 or later
 - Tailscale installed and configured on your system
 - Access to `tailscale` CLI command
+- (Optional) Kubernetes cluster and kubectl configured for operator features
 
 ### Build from Source
 
@@ -93,6 +102,24 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 }
 ```
 
+To enable Kubernetes operator features, set the `ENABLE_K8S_OPERATOR` environment variable:
+
+```json
+{
+  "mcpServers": {
+    "tailscale": {
+      "command": "/path/to/tailscale-mcp",
+      "env": {
+        "TAILSCALE_API_KEY": "tskey-api-...",
+        "TAILSCALE_TAILNET": "your-email@example.com",
+        "ENABLE_K8S_OPERATOR": "true",
+        "KUBECONFIG": "/path/to/kubeconfig"
+      }
+    }
+  }
+}
+```
+
 Or using the Claude CLI:
 
 ```bash
@@ -100,6 +127,12 @@ Or using the Claude CLI:
 claude mcp add -s user tailscale /path/to/tailscale-mcp \
   -e TAILSCALE_API_KEY=tskey-api-... \
   -e TAILSCALE_TAILNET=your-email@example.com
+
+# Add with Kubernetes operator support
+claude mcp add -s user tailscale /path/to/tailscale-mcp \
+  -e TAILSCALE_API_KEY=tskey-api-... \
+  -e TAILSCALE_TAILNET=your-email@example.com \
+  -e ENABLE_K8S_OPERATOR=true
 ```
 
 ### API Configuration
@@ -268,10 +301,20 @@ go-tailscale-mcp/
 │   ├── devices.go       # Device operation tools
 │   ├── network.go       # Network control tools
 │   ├── routing.go       # Routing and exit node tools
-│   └── system.go        # System information tools
-└── tailscale/
-    ├── cli.go           # CLI wrapper
-    └── types.go         # Type definitions
+│   ├── system.go        # System information tools
+│   ├── acl.go           # ACL management tools
+│   ├── authkeys.go      # Authentication key tools
+│   └── dns_api.go       # DNS API configuration tools
+├── tailscale/
+│   ├── cli.go           # CLI wrapper
+│   ├── api.go           # Tailscale API client
+│   └── types.go         # Type definitions
+└── k8s/
+    ├── client.go        # Kubernetes client setup
+    ├── operator.go      # Operator management functions
+    ├── resources.go     # Custom resource definitions
+    ├── errors.go        # Error handling and types
+    └── tools.go         # Kubernetes MCP tools
 ```
 
 ### API-Only Tools (Requires TAILSCALE_API_KEY)
@@ -300,12 +343,41 @@ go-tailscale-mcp/
 #### Route Management (with API)
 - `approve_routes` - Approve advertised routes (API-enabled)
 
+### Kubernetes Operator Tools (Requires ENABLE_K8S_OPERATOR=true)
+
+When enabled with the `ENABLE_K8S_OPERATOR=true` environment variable, the following tools become available:
+
+#### Operator Management
+- `mcp__tailscale__k8s_operator_install` - Install Tailscale operator with OAuth credentials
+- `mcp__tailscale__k8s_operator_status` - Check operator installation and health status
+- `mcp__tailscale__k8s_operator_upgrade` - Upgrade operator to a new version
+
+#### ProxyClass Management
+- `mcp__tailscale__k8s_proxy_class_create` - Create ProxyClass for custom proxy configurations
+- `mcp__tailscale__k8s_proxy_class_list` - List all ProxyClass resources
+- `mcp__tailscale__k8s_proxy_class_delete` - Delete a ProxyClass resource
+
+#### ProxyGroup Management
+- `mcp__tailscale__k8s_proxy_group_create` - Create ProxyGroup for HA configurations
+- `mcp__tailscale__k8s_proxy_group_status` - Get ProxyGroup status and readiness
+- `mcp__tailscale__k8s_proxy_group_scale` - Scale ProxyGroup replicas
+
+#### Ingress/Egress Services
+- `mcp__tailscale__k8s_ingress_create` - Create Tailscale ingress to expose services
+- `mcp__tailscale__k8s_egress_create` - Create egress service for tailnet access
+
+#### Connector & DNSConfig
+- `mcp__tailscale__k8s_connector_create` - Create Connector for subnet/exit node
+- `mcp__tailscale__k8s_dns_config_create` - Configure MagicDNS for Kubernetes
+
 ## Configuration Options
 
 ### Environment Variables
 
 - `TAILSCALE_API_KEY` - Your Tailscale API key for admin operations
 - `TAILSCALE_TAILNET` - Your tailnet domain (e.g., your-email@example.com or org.domain)
+- `ENABLE_K8S_OPERATOR` - Set to `true` to enable Kubernetes operator management features
+- `KUBECONFIG` - Path to kubeconfig file (optional, defaults to ~/.kube/config)
 
 ## Development
 
