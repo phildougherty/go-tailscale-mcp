@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/phildougherty/go-tailscale-mcp/server"
@@ -19,8 +20,17 @@ func main() {
 
 	ctx := context.Background()
 
+	// Check environment variable for Kubernetes operator support
+	enableK8sOperator := false
+	if k8sEnv := os.Getenv("ENABLE_K8S_OPERATOR"); k8sEnv != "" {
+		k8sEnv = strings.ToLower(k8sEnv)
+		if k8sEnv == "true" || k8sEnv == "1" || k8sEnv == "yes" || k8sEnv == "on" {
+			enableK8sOperator = true
+		}
+	}
+
 	// Create and configure the MCP server
-	srv, err := server.NewTailscaleServer()
+	srv, err := server.NewTailscaleServer(enableK8sOperator)
 	if err != nil {
 		log.Fatalf("Failed to create Tailscale MCP server: %v", err)
 	}

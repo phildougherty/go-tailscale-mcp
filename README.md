@@ -43,12 +43,19 @@ A Model Context Protocol (MCP) server for managing Tailscale through a standardi
 - Detailed tailnet information
 - Preferences management
 
+### Kubernetes Operator Management (Optional)
+- Manage Tailscale Kubernetes operator resources
+- Create ProxyGroups, ProxyClasses, Connectors, and DNSConfigs
+- Configure Tailscale Ingress and Egress services
+- Requires manual operator installation first
+
 ## Installation
 
 ### Prerequisites
 - Go 1.21 or later
 - Tailscale installed and configured on your system
 - Access to `tailscale` CLI command
+- (Optional) Kubernetes cluster and kubectl configured for operator features
 
 ### Build from Source
 
@@ -93,6 +100,24 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 }
 ```
 
+To enable Kubernetes operator features, set the `ENABLE_K8S_OPERATOR` environment variable:
+
+```json
+{
+  "mcpServers": {
+    "tailscale": {
+      "command": "/path/to/tailscale-mcp",
+      "env": {
+        "TAILSCALE_API_KEY": "tskey-api-...",
+        "TAILSCALE_TAILNET": "your-email@example.com",
+        "ENABLE_K8S_OPERATOR": "true",
+        "KUBECONFIG": "/path/to/kubeconfig"
+      }
+    }
+  }
+}
+```
+
 Or using the Claude CLI:
 
 ```bash
@@ -100,6 +125,12 @@ Or using the Claude CLI:
 claude mcp add -s user tailscale /path/to/tailscale-mcp \
   -e TAILSCALE_API_KEY=tskey-api-... \
   -e TAILSCALE_TAILNET=your-email@example.com
+
+# Add with Kubernetes operator support
+claude mcp add -s user tailscale /path/to/tailscale-mcp \
+  -e TAILSCALE_API_KEY=tskey-api-... \
+  -e TAILSCALE_TAILNET=your-email@example.com \
+  -e ENABLE_K8S_OPERATOR=true
 ```
 
 ### API Configuration
@@ -268,10 +299,20 @@ go-tailscale-mcp/
 │   ├── devices.go       # Device operation tools
 │   ├── network.go       # Network control tools
 │   ├── routing.go       # Routing and exit node tools
-│   └── system.go        # System information tools
-└── tailscale/
-    ├── cli.go           # CLI wrapper
-    └── types.go         # Type definitions
+│   ├── system.go        # System information tools
+│   ├── acl.go           # ACL management tools
+│   ├── authkeys.go      # Authentication key tools
+│   └── dns_api.go       # DNS API configuration tools
+├── tailscale/
+│   ├── cli.go           # CLI wrapper
+│   ├── api.go           # Tailscale API client
+│   └── types.go         # Type definitions
+└── k8s/
+    ├── client.go        # Kubernetes client setup
+    ├── operator.go      # Operator management functions
+    ├── resources.go     # Custom resource definitions
+    ├── errors.go        # Error handling and types
+    └── tools.go         # Kubernetes MCP tools
 ```
 
 ### API-Only Tools (Requires TAILSCALE_API_KEY)
@@ -300,12 +341,78 @@ go-tailscale-mcp/
 #### Route Management (with API)
 - `approve_routes` - Approve advertised routes (API-enabled)
 
+### Kubernetes Operator Tools (Requires ENABLE_K8S_OPERATOR=true)
+
+**Prerequisites:**
+1. Install the Tailscale Kubernetes operator first:
+   ```bash
+   # Using kubectl
+   kubectl apply -f https://tailscale.com/install/kubernetes/operator.yaml
+
+   # Or using Helm
+   helm repo add tailscale https://pkgs.tailscale.com/helmcharts
+   helm install tailscale-operator tailscale/tailscale-operator
+   ```
+2. Set `ENABLE_K8S_OPERATOR=true` in your MCP configuration
+3. Ensure `kubectl` is configured with cluster access
+
+#### Example Prompts
+
+**Exposing Services to Tailnet (Ingress):**
+```
+"Expose my nginx service on port 80 as 'webapp' to the tailnet"
+"Create a Tailscale ingress for service 'api-server' on port 8080"
+"Make my grafana dashboard accessible via Tailscale at hostname 'monitoring'"
+```
+Use case: Access internal Kubernetes services securely via your Tailscale network without public exposure.
+
+**Accessing External Tailnet Services (Egress):**
+```
+"Create an egress to access my database at 'db.tailnet' on port 5432"
+"Connect to external service 'backup-server.tailnet' from inside the cluster"
+"Set up egress for 'metrics-collector.tailnet' on port 9090"
+```
+Use case: Allow pods to connect to services running elsewhere in your tailnet.
+
+**High Availability with ProxyGroups:**
+```
+"Create a ProxyGroup with 3 replicas for high availability egress"
+"Deploy a ProxyGroup named 'ha-proxy' with type 'ingress' and 2 replicas"
+"Scale the ProxyGroup 'production-proxy' to 5 replicas"
+```
+Use case: Ensure resilient connectivity with multiple proxy replicas for production workloads.
+
+**Subnet Routing with Connectors:**
+```
+"Create a Connector to advertise subnet 10.0.0.0/24 to the tailnet"
+"Set up a Connector as an exit node for the cluster"
+"Deploy a Connector with hostname 'k8s-subnet' advertising routes 192.168.1.0/24"
+```
+Use case: Share cluster pod/service networks with your tailnet or route cluster traffic through Tailscale.
+
+**DNS Configuration:**
+```
+"Enable MagicDNS for the cluster"
+"Create a DNSConfig with MagicDNS enabled"
+"Configure cluster DNS to use Tailscale MagicDNS"
+```
+Use case: Enable automatic DNS resolution for tailnet hostnames within the cluster.
+
+**ProxyClass for Custom Configuration:**
+```
+"Create a ProxyClass named 'production' with specific labels"
+"Deploy a ProxyClass for custom proxy pod configuration"
+```
+Use case: Define reusable proxy configurations for different environments or requirements.
+
 ## Configuration Options
 
 ### Environment Variables
 
 - `TAILSCALE_API_KEY` - Your Tailscale API key for admin operations
 - `TAILSCALE_TAILNET` - Your tailnet domain (e.g., your-email@example.com or org.domain)
+- `ENABLE_K8S_OPERATOR` - Set to `true` to enable Kubernetes operator management features
+- `KUBECONFIG` - Path to kubeconfig file (optional, defaults to ~/.kube/config)
 
 ## Development
 
