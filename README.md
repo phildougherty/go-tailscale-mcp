@@ -43,13 +43,14 @@ A Model Context Protocol (MCP) server for managing Tailscale through a standardi
 - Detailed tailnet information
 - Preferences management
 
-### Kubernetes Operator (Optional)
-- Install and manage Tailscale Kubernetes operator
+### Kubernetes Operator Management (Optional)
+- Monitor Tailscale Kubernetes operator status
 - Create and manage ProxyClass resources
 - Deploy ProxyGroups for high availability
 - Configure Tailscale Ingress and Egress services
 - Manage Connectors for subnet routing and exit nodes
 - Configure DNSConfig resources
+- NOTE: Operator installation must be done manually using official methods
 
 ## Installation
 
@@ -347,10 +348,14 @@ go-tailscale-mcp/
 
 When enabled with the `ENABLE_K8S_OPERATOR=true` environment variable, the following tools become available:
 
+**Note:** The operator must be installed manually using the official Tailscale methods:
+- kubectl: `kubectl apply -f https://tailscale.com/install/kubernetes/operator.yaml`
+- Helm: `helm install tailscale-operator tailscale/tailscale-operator`
+- See: https://tailscale.com/kb/1236/kubernetes-operator
+
 #### Operator Management
-- `mcp__tailscale__k8s_operator_install` - Install Tailscale operator with OAuth credentials
 - `mcp__tailscale__k8s_operator_status` - Check operator installation and health status
-- `mcp__tailscale__k8s_operator_upgrade` - Upgrade operator to a new version
+- `mcp__tailscale__k8s_prepare_acl` - Get ACL configuration requirements for the operator
 
 #### ProxyClass Management
 - `mcp__tailscale__k8s_proxy_class_create` - Create ProxyClass for custom proxy configurations

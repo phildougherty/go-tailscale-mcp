@@ -26,23 +26,10 @@ func RegisterK8sOperatorTools(server *mcp.Server) error {
 	)
 
 	// Operator management tools
-	server.AddTool(
-		&mcp.Tool{
-			Name:        "mcp__tailscale__k8s_operator_install",
-			Description: "Install the Tailscale Kubernetes operator with OAuth credentials",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"oauth_client_id":     {Type: "string", Description: "OAuth client ID for the operator"},
-					"oauth_client_secret": {Type: "string", Description: "OAuth client secret for the operator"},
-					"image":               {Type: "string", Description: "Operator image (default: tailscale/k8s-operator:latest)"},
-					"namespace":           {Type: "string", Description: "Namespace for the operator (default: tailscale-system)"},
-				},
-				Required: []string{"oauth_client_id", "oauth_client_secret"},
-			},
-		},
-		mcp.ToolHandler(handleOperatorInstall),
-	)
+	// Operator installation removed - install manually using kubectl or helm
+	// The operator requires proper RBAC, CRDs, and configuration that are
+	// better handled through official Tailscale installation methods:
+	// https://tailscale.com/kb/1236/kubernetes-operator
 
 	server.AddTool(
 		&mcp.Tool{
@@ -54,22 +41,6 @@ func RegisterK8sOperatorTools(server *mcp.Server) error {
 			},
 		},
 		mcp.ToolHandler(handleOperatorStatus),
-	)
-
-	server.AddTool(
-		&mcp.Tool{
-			Name:        "mcp__tailscale__k8s_operator_upgrade",
-			Description: "Upgrade the Tailscale Kubernetes operator to a new version",
-			InputSchema: &jsonschema.Schema{
-				Type: "object",
-				Properties: map[string]*jsonschema.Schema{
-					"image": {Type: "string", Description: "New operator image version"},
-					"force": {Type: "boolean", Description: "Force upgrade even if already on target version"},
-				},
-				Required: []string{"image"},
-			},
-		},
-		mcp.ToolHandler(handleOperatorUpgrade),
 	)
 
 	// ProxyClass management
@@ -344,57 +315,7 @@ The OAuth client will look like:
 	}, nil
 }
 
-func handleOperatorInstall(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	var params struct {
-		OAuthClientID     string `json:"oauth_client_id"`
-		OAuthClientSecret string `json:"oauth_client_secret"`
-		Image             string `json:"image,omitempty"`
-		Namespace         string `json:"namespace,omitempty"`
-	}
-	if err := json.Unmarshal(req.Params.Arguments, &params); err != nil {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: fmt.Sprintf("Invalid parameters: %v", err)},
-			},
-		}, nil
-	}
-
-	client, err := NewClient()
-	if err != nil {
-		if k8sErr, ok := err.(*K8sError); ok {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					&mcp.TextContent{Text: k8sErr.FormatErrorWithHint()},
-				},
-			}, nil
-		}
-		return nil, err
-	}
-
-	opts := &InstallOperatorOptions{
-		OAuthClientID:     params.OAuthClientID,
-		OAuthClientSecret: params.OAuthClientSecret,
-		Image:             params.Image,
-		Namespace:         params.Namespace,
-	}
-
-	if err := client.InstallOperator(ctx, opts); err != nil {
-		if k8sErr, ok := err.(*K8sError); ok {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					&mcp.TextContent{Text: k8sErr.FormatErrorWithHint()},
-				},
-			}, nil
-		}
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: "Tailscale operator installed successfully"},
-		},
-	}, nil
-}
+// Removed handleOperatorInstall - operator should be installed using official methods
 
 func handleOperatorStatus(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	client, err := NewClient()
@@ -433,53 +354,7 @@ func handleOperatorStatus(ctx context.Context, req *mcp.CallToolRequest) (*mcp.C
 	}, nil
 }
 
-func handleOperatorUpgrade(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	var params struct {
-		Image string `json:"image"`
-		Force bool   `json:"force,omitempty"`
-	}
-	if err := json.Unmarshal(req.Params.Arguments, &params); err != nil {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: fmt.Sprintf("Invalid parameters: %v", err)},
-			},
-		}, nil
-	}
-
-	client, err := NewClient()
-	if err != nil {
-		if k8sErr, ok := err.(*K8sError); ok {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					&mcp.TextContent{Text: k8sErr.FormatErrorWithHint()},
-				},
-			}, nil
-		}
-		return nil, err
-	}
-
-	opts := &UpgradeOperatorOptions{
-		Image: params.Image,
-		Force: params.Force,
-	}
-
-	if err := client.UpgradeOperator(ctx, opts); err != nil {
-		if k8sErr, ok := err.(*K8sError); ok {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					&mcp.TextContent{Text: k8sErr.FormatErrorWithHint()},
-				},
-			}, nil
-		}
-		return nil, err
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Operator upgraded to %s successfully", opts.Image)},
-		},
-	}, nil
-}
+// Removed handleOperatorUpgrade - operator should be upgraded using official methods
 
 func handleProxyClassCreate(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var params struct {
@@ -990,15 +865,10 @@ func handleDNSConfigCreate(ctx context.Context, req *mcp.CallToolRequest) (*mcp.
 			Namespace: params.Namespace,
 		},
 		Spec: DNSConfigSpec{
-			MagicDNS: params.MagicDNS,
+			Nameserver: NameserverSpec{
+				// The nameserver will use default image if not specified
+			},
 		},
-	}
-
-	// Handle nameservers
-	for _, ns := range params.Nameservers {
-		dnsConfig.Spec.Nameservers = append(dnsConfig.Spec.Nameservers, NameserverSpec{
-			IP: ns,
-		})
 	}
 
 	if err := rm.CreateDNSConfig(ctx, dnsConfig); err != nil {

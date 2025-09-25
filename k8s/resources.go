@@ -59,10 +59,11 @@ type ProxyGroup struct {
 }
 
 type ProxyGroupSpec struct {
-	Type        string   `json:"type"` // "egress" or "ingress"
-	Replicas    *int32   `json:"replicas,omitempty"`
-	ProxyClass  string   `json:"proxyClass,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+	Type           string   `json:"type"` // "egress", "ingress", or "kube-apiserver"
+	Replicas       *int32   `json:"replicas,omitempty"`
+	ProxyClass     string   `json:"proxyClass,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
+	HostnamePrefix string   `json:"hostnamePrefix,omitempty"`
 }
 
 type ProxyGroupStatus struct {
@@ -108,12 +109,21 @@ type DNSConfig struct {
 }
 
 type DNSConfigSpec struct {
-	MagicDNS    bool              `json:"magicDNS"`
-	Nameservers []NameserverSpec  `json:"nameservers,omitempty"`
+	Nameserver NameserverSpec `json:"nameserver"`
 }
 
 type NameserverSpec struct {
-	IP string `json:"ip"`
+	Image   *NameserverImage   `json:"image,omitempty"`
+	Service *NameserverService `json:"service,omitempty"`
+}
+
+type NameserverImage struct {
+	Repo string `json:"repo,omitempty"`
+	Tag  string `json:"tag,omitempty"`
+}
+
+type NameserverService struct {
+	Type string `json:"type,omitempty"`
 }
 
 type DNSConfigStatus struct {
@@ -173,7 +183,7 @@ func (rm *ResourceManager) CreateProxyClass(ctx context.Context, proxyClass *Pro
 		return NewK8sError(ErrorTypeResourceInvalid, "failed to convert ProxyClass to unstructured", err)
 	}
 
-	_, err = rm.dynamicClient.Resource(ProxyClassGVR).Namespace(proxyClass.Metadata.Namespace).Create(ctx, unstructuredObj, metav1.CreateOptions{})
+	_, err = rm.dynamicClient.Resource(ProxyClassGVR).Create(ctx, unstructuredObj, metav1.CreateOptions{})
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			return NewResourceConflictError("ProxyClass", proxyClass.Metadata.Name, err)
@@ -190,7 +200,7 @@ func (rm *ResourceManager) ListProxyClasses(ctx context.Context, namespace strin
 		namespace = metav1.NamespaceAll
 	}
 
-	unstructuredList, err := rm.dynamicClient.Resource(ProxyClassGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	unstructuredList, err := rm.dynamicClient.Resource(ProxyClassGVR).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, NewConnectivityError("failed to list ProxyClasses", err)
 	}
@@ -209,7 +219,7 @@ func (rm *ResourceManager) ListProxyClasses(ctx context.Context, namespace strin
 
 // DeleteProxyClass deletes a ProxyClass resource
 func (rm *ResourceManager) DeleteProxyClass(ctx context.Context, namespace, name string) error {
-	err := rm.dynamicClient.Resource(ProxyClassGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := rm.dynamicClient.Resource(ProxyClassGVR).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return NewResourceNotFoundError("ProxyClass", name, err)
@@ -230,7 +240,7 @@ func (rm *ResourceManager) CreateProxyGroup(ctx context.Context, proxyGroup *Pro
 		return NewK8sError(ErrorTypeResourceInvalid, "failed to convert ProxyGroup to unstructured", err)
 	}
 
-	_, err = rm.dynamicClient.Resource(ProxyGroupGVR).Namespace(proxyGroup.Metadata.Namespace).Create(ctx, unstructuredObj, metav1.CreateOptions{})
+	_, err = rm.dynamicClient.Resource(ProxyGroupGVR).Create(ctx, unstructuredObj, metav1.CreateOptions{})
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			return NewResourceConflictError("ProxyGroup", proxyGroup.Metadata.Name, err)
@@ -243,7 +253,7 @@ func (rm *ResourceManager) CreateProxyGroup(ctx context.Context, proxyGroup *Pro
 
 // GetProxyGroupStatus gets the status of a ProxyGroup resource
 func (rm *ResourceManager) GetProxyGroupStatus(ctx context.Context, namespace, name string) (*ProxyGroupStatus, error) {
-	unstructuredObj, err := rm.dynamicClient.Resource(ProxyGroupGVR).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	unstructuredObj, err := rm.dynamicClient.Resource(ProxyGroupGVR).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, NewResourceNotFoundError("ProxyGroup", name, err)
@@ -261,7 +271,7 @@ func (rm *ResourceManager) GetProxyGroupStatus(ctx context.Context, namespace, n
 
 // ScaleProxyGroup scales a ProxyGroup resource
 func (rm *ResourceManager) ScaleProxyGroup(ctx context.Context, namespace, name string, replicas int32) error {
-	unstructuredObj, err := rm.dynamicClient.Resource(ProxyGroupGVR).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	unstructuredObj, err := rm.dynamicClient.Resource(ProxyGroupGVR).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return NewResourceNotFoundError("ProxyGroup", name, err)
@@ -274,7 +284,7 @@ func (rm *ResourceManager) ScaleProxyGroup(ctx context.Context, namespace, name 
 		return NewK8sError(ErrorTypeResourceInvalid, "failed to set replicas", err)
 	}
 
-	_, err = rm.dynamicClient.Resource(ProxyGroupGVR).Namespace(namespace).Update(ctx, unstructuredObj, metav1.UpdateOptions{})
+	_, err = rm.dynamicClient.Resource(ProxyGroupGVR).Update(ctx, unstructuredObj, metav1.UpdateOptions{})
 	if err != nil {
 		return NewK8sError(ErrorTypeUnknown, "failed to scale ProxyGroup", err)
 	}
@@ -292,7 +302,7 @@ func (rm *ResourceManager) CreateConnector(ctx context.Context, connector *Conne
 		return NewK8sError(ErrorTypeResourceInvalid, "failed to convert Connector to unstructured", err)
 	}
 
-	_, err = rm.dynamicClient.Resource(ConnectorGVR).Namespace(connector.Metadata.Namespace).Create(ctx, unstructuredObj, metav1.CreateOptions{})
+	_, err = rm.dynamicClient.Resource(ConnectorGVR).Create(ctx, unstructuredObj, metav1.CreateOptions{})
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			return NewResourceConflictError("Connector", connector.Metadata.Name, err)
@@ -313,7 +323,7 @@ func (rm *ResourceManager) CreateDNSConfig(ctx context.Context, dnsConfig *DNSCo
 		return NewK8sError(ErrorTypeResourceInvalid, "failed to convert DNSConfig to unstructured", err)
 	}
 
-	_, err = rm.dynamicClient.Resource(DNSConfigGVR).Namespace(dnsConfig.Metadata.Namespace).Create(ctx, unstructuredObj, metav1.CreateOptions{})
+	_, err = rm.dynamicClient.Resource(DNSConfigGVR).Create(ctx, unstructuredObj, metav1.CreateOptions{})
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
 			return NewResourceConflictError("DNSConfig", dnsConfig.Metadata.Name, err)

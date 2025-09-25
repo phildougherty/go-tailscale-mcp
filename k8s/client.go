@@ -109,8 +109,8 @@ func (c *Client) GetServerVersion() (string, error) {
 
 // CheckPermissions checks if we have the necessary permissions for Tailscale operator operations
 func (c *Client) CheckPermissions(ctx context.Context) error {
-	// Check if we can access the tailscale-system namespace
-	_, err := c.clientset.CoreV1().Namespaces().Get(ctx, "tailscale-system", metav1.GetOptions{})
+	// Check if we can access the tailscale namespace
+	_, err := c.clientset.CoreV1().Namespaces().Get(ctx, "tailscale", metav1.GetOptions{})
 	if err != nil {
 		// Namespace might not exist yet, that's OK
 		// But we should be able to create it
@@ -118,7 +118,7 @@ func (c *Client) CheckPermissions(ctx context.Context) error {
 	}
 
 	// TODO: Add more specific permission checks for:
-	// - Deployments, Services, Secrets in tailscale-system namespace
+	// - Deployments, Services, Secrets in tailscale namespace
 	// - ClusterRoles and ClusterRoleBindings
 	// - Custom Resource Definitions
 	// - ServiceAccounts

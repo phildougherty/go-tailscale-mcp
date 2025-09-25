@@ -112,8 +112,8 @@ func (e *K8sError) GetTroubleshootingHint() string {
 		return "Troubleshooting tips:\n" +
 			"1. Install the Tailscale operator: kubectl apply -f https://github.com/tailscale/tailscale/raw/main/cmd/k8s-operator/deploy/manifests/operator.yaml\n" +
 			"2. Or use the tool: mcp__tailscale__k8s_operator_install\n" +
-			"3. Check operator status: kubectl get pods -n tailscale-system\n" +
-			"4. Verify operator deployment: kubectl get deployment -n tailscale-system"
+			"3. Check operator status: kubectl get pods -n tailscale\n" +
+			"4. Verify operator deployment: kubectl get deployment -n tailscale"
 
 	case ErrorTypeResourceConflict:
 		return "Troubleshooting tips:\n" +
