@@ -109,25 +109,41 @@ func (c *CLI) ListProfiles() ([]Profile, error) {
 		return nil, err
 	}
 
-	// Parse the output to extract profiles
+	// Parse the table output
+	// Format: ID    Tailnet                   Account
+	//         826b  phil.dougherty@gmail.com  phil.dougherty@gmail.com*
 	profiles := []Profile{}
 	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
+
+	for i, line := range lines {
+		// Skip header line and empty lines
+		if i == 0 || strings.TrimSpace(line) == "" {
 			continue
 		}
 
-		// Check if this is the active profile (marked with *)
-		active := strings.HasPrefix(line, "*")
-		if active {
-			line = strings.TrimPrefix(line, "*")
-			line = strings.TrimSpace(line)
+		// Split by whitespace and reconstruct fields
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+
+		// Extract ID and tailnet
+		id := fields[0]
+		tailnet := fields[1]
+
+		// Extract account and check if it's active (marked with *)
+		account := fields[2]
+		active := false
+		if strings.HasSuffix(account, "*") {
+			active = true
+			account = strings.TrimSuffix(account, "*")
 		}
 
 		profiles = append(profiles, Profile{
-			Name:   line,
-			Active: active,
+			ID:      id,
+			Tailnet: tailnet,
+			Account: account,
+			Active:  active,
 		})
 	}
 
@@ -186,4 +202,11 @@ func (c *CLI) AcceptRoutes(accept bool) error {
 	}
 	_, err := c.Execute("set", "--accept-routes", value)
 	return err
+}
+
+// LoginNewProfile logs in with a new profile
+func (c *CLI) LoginNewProfile() (string, error) {
+	// This will start the login process and return the auth URL
+	output, err := c.Execute("login")
+	return output, err
 }
