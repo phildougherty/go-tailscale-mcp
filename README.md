@@ -162,9 +162,10 @@ Without the API, the server still provides full network management through the C
 ## Available Tools
 
 ### Profile Management
-- `switch_profile` - Switch between Tailscale accounts
-- `list_profiles` - List all available profiles
+- `switch_profile` - Switch between Tailscale accounts (supports ID, email, or tailnet name)
+- `list_profiles` - List all available profiles with details
 - `get_current_profile` - Get current profile details
+- `add_profile` - Add a new Tailscale profile by logging in to a different account
 
 ### Device Operations
 - `list_devices` - List all network devices with details
@@ -209,6 +210,9 @@ Without the API, the server still provides full network management through the C
 "Switch to my work Tailscale profile"
 "What's my current Tailscale profile?"
 "Show me which Tailscale account is active"
+"Add a new Tailscale profile"
+"Switch to profile phil@company.com"
+"Switch to profile ID 826b"
 ```
 
 ### Device Operations

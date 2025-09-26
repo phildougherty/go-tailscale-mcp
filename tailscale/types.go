@@ -63,8 +63,10 @@ type User struct {
 
 // Profile represents a Tailscale profile
 type Profile struct {
-	Name   string `json:"name"`
-	Active bool   `json:"active"`
+	ID       string `json:"id"`       // Profile ID (e.g., "826b")
+	Tailnet  string `json:"tailnet"`  // Tailnet name/email
+	Account  string `json:"account"`  // Account email
+	Active   bool   `json:"active"`   // Whether this profile is currently active
 }
 
 // Device represents a device in the network

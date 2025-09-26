@@ -75,6 +75,7 @@ func (s *TailscaleServer) registerTools() error {
 	tools.RegisterNetworkTools(s.Server, s.cli)
 	tools.RegisterRoutingToolsWithAPI(s.Server, s.cli, s.api)
 	tools.RegisterSystemTools(s.Server, s.cli)
+	tools.RegisterDiagnosticTools(s.Server, s.cli)
 
 	// Register API-specific tools if API is available
 	if s.api != nil && s.api.IsAvailable() {
