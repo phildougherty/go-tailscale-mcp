@@ -96,60 +96,6 @@ func (c *CLI) Down() error {
 	return err
 }
 
-// SwitchProfile switches to a different Tailscale profile
-func (c *CLI) SwitchProfile(profile string) error {
-	_, err := c.Execute("switch", profile)
-	return err
-}
-
-// ListProfiles lists all available profiles
-func (c *CLI) ListProfiles() ([]Profile, error) {
-	output, err := c.Execute("switch", "--list")
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse the table output
-	// Format: ID    Tailnet                   Account
-	//         826b  phil.dougherty@gmail.com  phil.dougherty@gmail.com*
-	profiles := []Profile{}
-	lines := strings.Split(output, "\n")
-
-	for i, line := range lines {
-		// Skip header line and empty lines
-		if i == 0 || strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		// Split by whitespace and reconstruct fields
-		fields := strings.Fields(line)
-		if len(fields) < 3 {
-			continue
-		}
-
-		// Extract ID and tailnet
-		id := fields[0]
-		tailnet := fields[1]
-
-		// Extract account and check if it's active (marked with *)
-		account := fields[2]
-		active := false
-		if strings.HasSuffix(account, "*") {
-			active = true
-			account = strings.TrimSuffix(account, "*")
-		}
-
-		profiles = append(profiles, Profile{
-			ID:      id,
-			Tailnet: tailnet,
-			Account: account,
-			Active:  active,
-		})
-	}
-
-	return profiles, nil
-}
-
 // Ping pings a peer device
 func (c *CLI) Ping(target string, count int) (string, error) {
 	args := []string{"ping", target}
@@ -204,9 +150,3 @@ func (c *CLI) AcceptRoutes(accept bool) error {
 	return err
 }
 
-// LoginNewProfile logs in with a new profile
-func (c *CLI) LoginNewProfile() (string, error) {
-	// This will start the login process and return the auth URL
-	output, err := c.Execute("login")
-	return output, err
-}

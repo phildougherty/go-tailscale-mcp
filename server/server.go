@@ -70,7 +70,6 @@ func NewTailscaleServer(enableK8sOperator bool) (*TailscaleServer, error) {
 
 func (s *TailscaleServer) registerTools() error {
 	// Register all Tailscale tool categories
-	tools.RegisterProfileTools(s.Server, s.cli)
 	tools.RegisterDeviceToolsWithAPI(s.Server, s.cli, s.api)
 	tools.RegisterNetworkTools(s.Server, s.cli)
 	tools.RegisterRoutingToolsWithAPI(s.Server, s.cli, s.api)

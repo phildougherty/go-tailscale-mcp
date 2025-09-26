@@ -4,11 +4,9 @@ A Model Context Protocol (MCP) server for managing Tailscale through a standardi
 
 ## Features
 
-### Authentication & Profile Management
-- Switch between multiple Tailscale profiles
-- List available profiles with active status
+### Authentication & Configuration
 - Login/logout functionality
-- Get current profile details
+- Configure using TAILSCALE_TAILNET environment variable
 
 ### Device Management
 - List all devices in the network
@@ -161,12 +159,6 @@ Without the API, the server still provides full network management through the C
 
 ## Available Tools
 
-### Profile Management
-- `switch_profile` - Switch between Tailscale accounts (supports ID, email, or tailnet name)
-- `list_profiles` - List all available profiles with details
-- `get_current_profile` - Get current profile details
-- `add_profile` - Add a new Tailscale profile by logging in to a different account
-
 ### Device Operations
 - `list_devices` - List all network devices with details
 - `get_device` - Get specific device information
@@ -201,18 +193,6 @@ Without the API, the server still provides full network management through the C
 "Get the IP address for my device named 'laptop'"
 "Check my Tailscale network health"
 "What version of Tailscale am I running?"
-```
-
-### Profile Management
-
-```
-"List my Tailscale profiles"
-"Switch to my work Tailscale profile"
-"What's my current Tailscale profile?"
-"Show me which Tailscale account is active"
-"Add a new Tailscale profile"
-"Switch to profile phil@company.com"
-"Switch to profile ID 826b"
 ```
 
 ### Device Operations
@@ -299,7 +279,6 @@ go-tailscale-mcp/
 ├── server/
 │   └── server.go        # MCP server setup
 ├── tools/
-│   ├── profiles.go      # Profile management tools
 │   ├── devices.go       # Device operation tools
 │   ├── network.go       # Network control tools
 │   ├── routing.go       # Routing and exit node tools
